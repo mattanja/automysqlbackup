@@ -126,50 +126,46 @@ The global config file which overwrites the default configuration is located her
 Please take a look at the supplied "automysqlbackup.conf" for information about the configuration options.
 
 Default configuration
-CONFIG_configfile="/etc/automysqlbackup/automysqlbackup.conf"
-CONFIG_backup_dir='/var/backup/db'
-CONFIG_do_monthly="01"
-CONFIG_do_weekly="5"
-CONFIG_rotation_daily=6
-CONFIG_rotation_weekly=35
-CONFIG_rotation_monthly=150
-CONFIG_mysql_dump_usessl='yes'
-CONFIG_mysql_dump_username='root'
-CONFIG_mysql_dump_password=''
-CONFIG_mysql_dump_host='localhost'
-CONFIG_mysql_dump_socket=''
-CONFIG_mysql_dump_create_database='no'
-CONFIG_mysql_dump_use_separate_dirs='yes'
-CONFIG_mysql_dump_compression='gzip'
-CONFIG_mysql_dump_commcomp='no'
-CONFIG_mysql_dump_latest='no'
-CONFIG_mysql_dump_max_allowed_packet=''
-CONFIG_db_names=()
-CONFIG_db_month_names=()
-CONFIG_db_exclude=( 'information_schema' )
-CONFIG_mailcontent='log'
-CONFIG_mail_maxattsize=4000
-CONFIG_mail_address='root'
-CONFIG_encrypt='no'
-CONFIG_encrypt_password='password0123'
+  CONFIG_configfile="/etc/automysqlbackup/automysqlbackup.conf"
+  CONFIG_backup_dir='/var/backup/db'
+  CONFIG_do_monthly="01"
+  CONFIG_do_weekly="5"
+  CONFIG_rotation_daily=6
+  CONFIG_rotation_weekly=35
+  CONFIG_rotation_monthly=150
+  CONFIG_mysql_dump_usessl='yes'
+  CONFIG_mysql_dump_username='root'
+  CONFIG_mysql_dump_password=''
+  CONFIG_mysql_dump_host='localhost'
+  CONFIG_mysql_dump_socket=''
+  CONFIG_mysql_dump_create_database='no'
+  CONFIG_mysql_dump_use_separate_dirs='yes'
+  CONFIG_mysql_dump_compression='gzip'
+  CONFIG_mysql_dump_commcomp='no'
+  CONFIG_mysql_dump_latest='no'
+  CONFIG_mysql_dump_max_allowed_packet=''
+  CONFIG_db_names=()
+  CONFIG_db_month_names=()
+  CONFIG_db_exclude=( 'information_schema' )
+  CONFIG_mailcontent='log'
+  CONFIG_mail_maxattsize=4000
+  CONFIG_mail_address='root'
+  CONFIG_encrypt='no'
+  CONFIG_encrypt_password='password0123'
 
 !! automysqlbackup (the shell program) accepts one parameter, the filename of a configuration file. The entries in there will supersede all others.
 
 Please take a look at the supplied "automysqlbackup.conf" for information about the configuration options.
 
-
-
-.. ENCRYPTION
--------------------------
+ENCRYPTION
+----------
 
 To decrypt run (replace bz2 with gz if using gzip):
 
 openssl enc -aes-256-cbc -d -in encrypted_file_name(ex: *.enc.bz2) -out outputfilename.bz2 -pass pass:PASSWORD-USED-TO-ENCRYPT
 
-
-
-.. BACKUP ROTATION
--------------------------
+BACKUP ROTATION
+---------------
 
 Daily Backups are rotated weekly.
 Weekly Backups are run on fridays, unless otherwise specified via CONFIG_do_weekly.
@@ -179,10 +175,8 @@ Monthly Backups are rotated on a 5 month cycle, unless otherwise specified via C
 
 Suggestion: It may be a good idea to copy monthly backups offline or to another server.
 
-
-
-.. RESTORING
--------------------------
+RESTORING
+---------
 
 Firstly you will need to uncompress the backup file and decrypt it if encryption was used (see encryption section).
 
