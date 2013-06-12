@@ -70,7 +70,7 @@ upgrade_config_file () {
     if isSet BACKUPDIR; then
       printf '%s=%q\n' CONFIG_backup_dir "${BACKUPDIR-}"
     else
-      echo "#CONFIG_backup_dir='/var/backup/db'"
+      echo "#CONFIG_backup_dir='/var/lib/automysqlbackup'"
     fi
     echo ""
     echo "# This is practically a moot point, since there is a fallback to the compression"

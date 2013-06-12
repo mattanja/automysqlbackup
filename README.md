@@ -51,9 +51,9 @@ Automysqlbackup can be run a number of ways, you can choose which is best for yo
     
     /usr/local/bin/automysqlbackup /etc/automysqlbackup/myserver.conf
     
-    chown root.root /var/backup/db* -R
-    find /var/backup/db* -type f -exec chmod 400 {} \;
-    find /var/backup/db* -type d -exec chmod 700 {} \;
+    chown root.root /var/lib/automysqlbackup* -R
+    find /var/lib/automysqlbackup* -type f -exec chmod 400 {} \;
+    find /var/lib/automysqlbackup* -type d -exec chmod 700 {} \;
 
 2. Save it to a suitable location or copy it to your /etc/cron.daily folder. 
 3. Make it executable, i.e. chmod +x /etc/cron.daily/runmysqlbackup.
@@ -127,7 +127,7 @@ Please take a look at the supplied "automysqlbackup.conf" for information about 
 
 Default configuration
   CONFIG_configfile="/etc/automysqlbackup/automysqlbackup.conf"
-  CONFIG_backup_dir='/var/backup/db'
+  CONFIG_backup_dir='/var/lib/automysqlbackup'
   CONFIG_do_monthly="01"
   CONFIG_do_weekly="5"
   CONFIG_rotation_daily=6
