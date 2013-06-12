@@ -441,7 +441,7 @@ echo
 #copying files
 echo "### Copying files."
 echo
-cp -i automysqlbackup.conf LICENSE README "${configdir}"/
+cp -i automysqlbackup.conf LICENSE README.md "${configdir}"/
 cp -i automysqlbackup.conf "${configdir}"/myserver.conf
 cp -i automysqlbackup "${bindir}"/
 [[ -f "${bindir}"/automysqlbackup ]] && [[ -x "${bindir}"/automysqlbackup ]] || chmod +x "${bindir}"/automysqlbackup || echo " failed - make sure you make the program executable, i.e. run 'chmod +x ${bindir}/automysqlbackup'"
