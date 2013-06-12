@@ -1,0 +1,3 @@
+# Put this file into /etc/cron.d and adjust to your needs.
+# Run the mysql backup scripts every morning at 4.30 h:
+30 4 * * * root /etc/automysqlbackup/run
