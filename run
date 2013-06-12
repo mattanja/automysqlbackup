@@ -1,0 +1,13 @@
+#!/bin/sh
+TARGET_DIR=/var/lib/automysqlbackup
+
+# Make sure the target directory exists:
+mkdir -p $TARGET_DIR
+
+# Run the backups:
+/usr/local/bin/automysqlbackup /etc/automysqlbackup/myserver.conf
+
+# Fix permissions of backups:
+chown root.root $TARGET_DIR* -R
+find $TARGET_DIR* -type f -exec chmod 400 {} \;
+find $TARGET_DIR* -type d -exec chmod 700 {} \;
