@@ -70,7 +70,7 @@ upgrade_config_file () {
     if isSet BACKUPDIR; then
       printf '%s=%q\n' CONFIG_backup_dir "${BACKUPDIR-}"
     else
-      echo "#CONFIG_backup_dir='/var/lib/automysqlbackup'"
+      echo "#CONFIG_backup_dir='/var/backup/db'"
     fi
     echo ""
     echo "# This is practically a moot point, since there is a fallback to the compression"
@@ -400,6 +400,35 @@ parse_config_file () {
   fi
 }
 
+#precheck
+echo "### Checking archive files for existence, readability and integrity."
+echo
+
+precheck_files=( automysqlbackup 447c33d2546181d07d0c0d69d76b189b
+automysqlbackup.conf d525efa3da15ce9fea96893e5a8ce6d5
+README b17740fcd3a5f8579b907a42249a83cd
+LICENSE 39bba7d2cf0ba1036f2a6e2be52fe3f0
+)
+
+n=$(( ${#precheck_files[@]}/2 ))
+i=0
+while [ $i -lt $n ]; do
+  printf "${precheck_files[$((2*$i))]} ... "
+  if [ -r "${precheck_files[$((2*$i))]}" ]; then
+    printf "exists and is readable ... "
+  else
+    printf "failed\n"
+    exit 1
+  fi
+  if echo "${precheck_files[$((2*$i+1))]}  ${precheck_files[$((2*$i))]}" | md5sum --check >/dev/null 2>&1; then
+    printf "md5sum okay :)\n"
+  else
+    printf "md5sum failed :(\n"
+    exit 1
+  fi
+  let i+=1
+done
+
 echo
 printf 'Select the global configuration directory [/etc/automysqlbackup]: '
 read configdir
@@ -441,7 +470,7 @@ echo
 #copying files
 echo "### Copying files."
 echo
-cp -i automysqlbackup.conf LICENSE README.md run example-cron-file conf-diff "${configdir}"/
+cp -i automysqlbackup.conf LICENSE README "${configdir}"/
 cp -i automysqlbackup.conf "${configdir}"/myserver.conf
 cp -i automysqlbackup "${bindir}"/
 [[ -f "${bindir}"/automysqlbackup ]] && [[ -x "${bindir}"/automysqlbackup ]] || chmod +x "${bindir}"/automysqlbackup || echo " failed - make sure you make the program executable, i.e. run 'chmod +x ${bindir}/automysqlbackup'"

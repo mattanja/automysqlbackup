@@ -1,3 +1,0 @@
-#!/bin/sh
-echo See what has been inserted in myserver.conf:
-diff automysqlbackup.conf myserver.conf|grep ">"
