@@ -81,6 +81,7 @@ load_default_config() {
   CONFIG_mysql_dump_single_transaction='no'
   CONFIG_mysql_dump_master_data=
   CONFIG_mysql_dump_full_schema='yes'
+  CONFIG_mysql_dump_flush_logs='no'
   CONFIG_mysql_dump_dbstatus='yes'
   CONFIG_mysql_dump_differential='no'
   CONFIG_backup_local_files=()
@@ -459,6 +460,10 @@ parse_configuration () {
 	  opt=( "${opt[@]}" '--single-transaction' )
 	  opt_fullschema=( "${opt_fullschema[@]}" '--single-transaction' )
     }
+    [[ "${CONFIG_mysql_dump_flush_logs}" = "yes" ]]	&& {
+        opt=( "${opt[@]}" '--flush-logs' )
+    }
+
     [[ "${CONFIG_mysql_dump_commcomp}" = "yes" ]]		&& {
 	  opt=( "${opt[@]}" '--compress' )
 	  opt_fullschema=( "${opt_fullschema[@]}" '--compress' )
