@@ -450,10 +450,10 @@ parse_configuration () {
 	opt_dbstatus=( '--status' )
 
     [[ "${CONFIG_mysql_dump_usessl}" = "yes" ]] 		&& {
-	  opt=( "${opt[@]}" '--ssl' )
-	  mysql_opt=( "${mysql_opt[@]}" '--ssl' )
-	  opt_fullschema=( "${opt_fullschema[@]}" '--ssl' )
-	  opt_dbstatus=( "${opt_dbstatus[@]}" '--ssl' )
+	  opt=( "${opt[@]}" '--ssl-mode' )
+	  mysql_opt=( "${mysql_opt[@]}" '--ssl-mode' )
+	  opt_fullschema=( "${opt_fullschema[@]}" '--ssl-mode' )
+	  opt_dbstatus=( "${opt_dbstatus[@]}" '--ssl-mode' )
     }
     [[ "${CONFIG_mysql_dump_master_data}" ]] && (( ${CONFIG_mysql_dump_master_data} == 1 || ${CONFIG_mysql_dump_master_data} == 2 )) && { opt=( "${opt[@]}" "--master-data=${CONFIG_mysql_dump_master_data}" );}
     [[ "${CONFIG_mysql_dump_single_transaction}" = "yes" ]]	&& {
