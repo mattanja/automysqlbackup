@@ -88,6 +88,8 @@ load_default_config() {
   CONFIG_db_names=()
   CONFIG_db_month_names=()
   CONFIG_db_exclude=( 'information_schema' )
+  CONFIG_db_utf8mb4=()
+  CONFIG_db_month_utf8mb4=()
   CONFIG_table_exclude=()
   CONFIG_mailcontent='stdout'
   CONFIG_mail_maxattsize=4000
@@ -605,7 +607,7 @@ fullschema () {
 }
 
 # @info:	Process a single db.
-# @args:	subfolder, prefix, midfix, extension, rotation, rotation_divisor, rotation_string, 0/1 (db/dbs), db[, db ...]
+# @args:	subfolder, prefix, midfix, extension, rotation, rotation_divisor, rotation_string, 0/1 (utf8mb3/utf8mb4), 0/1 (db/dbs), db[, db ...]
 process_dbs() {
   local subfolder="$1"
   local prefix="$2"
@@ -614,8 +616,11 @@ process_dbs() {
   local rotation="$5"
   local rotation_divisor="$6"
   local rotation_string="$7"
-  local multipledbs="$8"
-  shift 8
+  local utf8mb4="$8"
+  local multipledbs="$9"
+  
+  
+  shift 9
 
   local name
   local subsubfolder
@@ -780,6 +785,21 @@ process_dbs() {
 		  ;;
 		esac
 		return 0;
+	  elif (( $utf8mb4 )); then
+		case "${CONFIG_mysql_dump_compression}" in
+		'gzip')
+		  mysqldump --user="${CONFIG_mysql_dump_username}" --password="${CONFIG_mysql_dump_password}" --default-character-set=utf8mb4 --host="${CONFIG_mysql_dump_host}" "${opt[@]}" "$@" | gzip_compression > "${cfname}"
+		  ret=$?
+		  ;;
+		'bzip2')
+		  mysqldump --user="${CONFIG_mysql_dump_username}" --password="${CONFIG_mysql_dump_password}" --default-character-set=utf8mb4 --host="${CONFIG_mysql_dump_host}" "${opt[@]}" "$@" | bzip2_compression > "${cfname}"
+		  ret=$?
+		  ;;
+		*)
+		  mysqldump --user="${CONFIG_mysql_dump_username}" --password="${CONFIG_mysql_dump_password}" --default-character-set=utf8mb4 --host="${CONFIG_mysql_dump_host}" "${opt[@]}" "$@" > "${cfname}"
+		  ret=$?
+		  ;;
+		esac	
 	  else
 		case "${CONFIG_mysql_dump_compression}" in
 		'gzip')
@@ -1081,9 +1101,16 @@ parse_databases() {
   done
   # <- remove excluded dbs from list
 
+  # -> remove MySQL 4-byte dbs from list
+  for exclude in "${CONFIG_db_utf8mb4[@]}"; do
+        for i in "${!alldbnames[@]}"; do if [[ "x${alldbnames[$i]}" = "x${exclude}" ]]; then unset 'alldbnames[i]'; fi; done
+  done
+  # <- remove MySQL 4-byte dbs from list
+
   # check for empty array lists and copy all dbs
   ((! ${#CONFIG_db_names[@]}))	&& CONFIG_db_names=( "${alldbnames[@]}" )
   ((! ${#CONFIG_db_month_names[@]}))	&& CONFIG_db_month_names=( "${alldbnames[@]}" )
+  ((! ${#CONFIG_db_month_utf8mb4[@]}))    && CONFIG_db_month_utf8mb4=( "${CONFIG_db_utf8mb4[@]}" )
   printf "done.\n"
 }
 
@@ -1679,7 +1706,7 @@ method_backup () {
 
 	# debug output of variables
 	(( $CONFIG_debug )) && { echo; echo "# DEBUG: printing all current variables"; declare -p | egrep -o '.* (CONFIG_[a-z_]*|opt|mysql_opt|opt_dbstatus|opt_fullschema)=.*'; echo; }
-	(( $CONFIG_debug )) && { echo "DEBUG: before pre-backup"; ( IFS=,; echo "DEBUG: CONFIG_db_names '${CONFIG_db_names[*]}'" ); ( IFS=,; echo "DEBUG: CONFIG_db_month_names '${CONFIG_db_month_names[*]}'" );}
+	(( $CONFIG_debug )) && { echo "DEBUG: before pre-backup"; ( IFS=,; echo "DEBUG: CONFIG_db_names '${CONFIG_db_names[*]}'" ); ( IFS=,; echo "DEBUG: CONFIG_db_month_names '${CONFIG_db_month_names[*]}'" ); ( IFS=,; echo "DEBUG: CONFIG_db_utf8mb4s '${CONFIG_db_utf8mb4s[*]}'" ); ( IFS=,; echo "DEBUG: CONFIG_db_month_utf8mb4s '${CONFIG_db_month_utf8mb4s[*]}'" );}
 
 
 	# END __PREPARE
@@ -1708,7 +1735,9 @@ method_backup () {
 	echo 
 	echo "Backup of Database Server - ${CONFIG_mysql_dump_host_friendly:-$CONFIG_mysql_dump_host}"
 	( IFS=,; echo "Databases - ${CONFIG_db_names[*]}" )
+	( IFS=,; echo "Databases (4 bytes) - ${CONFIG_db_utf8mb4[*]}" )
 	( IFS=,; echo "Databases (monthly) - ${CONFIG_db_month_names[*]}" )
+    ( IFS=,; echo "Databases (4 bytes monthly) - ${CONFIG_db_month_utf8mb4[*]}" )
 	echo "======================================================================"
 
 
@@ -1894,13 +1923,23 @@ method_backup () {
 			for db in "${CONFIG_db_month_names[@]}"; do
 			  echo "Monthly Backup of Database ( ${db} )"
 			  (shopt -s nullglob dotglob; f=("${CONFIG_backup_dir}/${subfolder}/${db}/${prefix}${db}_${date_stamp}_"[0-9][0-9]"h"[0-9][0-9]"m${midfix}${extension}${suffix}"); ((${#f[@]}))) && continue
-			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 0 "$db"
+			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 0 0 "$db"
+			  echo ----------------------------------------------------------------------
+			done
+			for db in "${CONFIG_db_month_utf8mb4[@]}"; do
+			  echo "Monthly Backup of Database ( ${db} )"
+			  (shopt -s nullglob dotglob; f=("${CONFIG_backup_dir}/${subfolder}/${db}/${prefix}${db}_${date_stamp}_"[0-9][0-9]"h"[0-9][0-9]"m${midfix}${extension}${suffix}"); ((${#f[@]}))) && continue
+			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 1 0 "$db"
 			  echo ----------------------------------------------------------------------
 			done
 		  else
 			  echo "Monthly backup of databases ( ${CONFIG_db_month_names[@]} )."
 			  (shopt -s nullglob dotglob; f=("${CONFIG_backup_dir}/${subfolder}/${prefix}all-databases_${date_stamp}_"[0-9][0-9]"h"[0-9][0-9]"m${midfix}${extension}${suffix}"); ((${#f[@]}))) &&
-				process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 1 "${CONFIG_db_month_names[@]}"
+				process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 0 1 "${CONFIG_db_month_names[@]}"
+			  echo "----------------------------------------------------------------------"
+			  echo "Monthly backup of databases ( ${CONFIG_db_month_utf8mb4[@]} )."
+			  (shopt -s nullglob dotglob; f=("${CONFIG_backup_dir}/${subfolder}/${prefix}all-databases_${date_stamp}_"[0-9][0-9]"h"[0-9][0-9]"m${midfix}${extension}${suffix}"); ((${#f[@]}))) &&
+				process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 1 1 "${CONFIG_db_month_utf8mb4[@]}"
 			  echo "----------------------------------------------------------------------"
 		  fi
 	  fi
@@ -1922,13 +1961,23 @@ method_backup () {
 			for db in "${CONFIG_db_names[@]}"; do
 			  echo "Weekly Backup of Database ( ${db} )"
 			  (shopt -s nullglob dotglob; f=("${CONFIG_backup_dir}/${subfolder}/${db}/${prefix}${db}_${date_stamp}_"[0-9][0-9]"h"[0-9][0-9]"m${midfix}${extension}${suffix}"); ((${#f[@]}))) && continue
-			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 0 "$db"
+			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 0 0 "$db"
+			  echo "----------------------------------------------------------------------"
+			done
+			for db in "${CONFIG_db_utf8mb4[@]}"; do
+			  echo "Weekly Backup of Database ( ${db} )"
+			  (shopt -s nullglob dotglob; f=("${CONFIG_backup_dir}/${subfolder}/${db}/${prefix}${db}_${date_stamp}_"[0-9][0-9]"h"[0-9][0-9]"m${midfix}${extension}${suffix}"); ((${#f[@]}))) && continue
+			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 1 0 "$db"
 			  echo "----------------------------------------------------------------------"
 			done
 		  else
 			echo "Weekly backup of databases ( ${CONFIG_db_names[@]} )."
 			(shopt -s nullglob dotglob; f=("${CONFIG_backup_dir}/${subfolder}/${prefix}all-databases_${date_stamp}_"[0-9][0-9]"h"[0-9][0-9]"m${midfix}${extension}${suffix}"); ((${#f[@]}))) &&
-			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 1 "${CONFIG_db_names[@]}"
+			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 0 1 "${CONFIG_db_names[@]}"
+			echo "----------------------------------------------------------------------"
+			echo "Weekly backup of databases ( ${CONFIG_db_utf8mb4[@]} )."
+			(shopt -s nullglob dotglob; f=("${CONFIG_backup_dir}/${subfolder}/${prefix}all-databases_${date_stamp}_"[0-9][0-9]"h"[0-9][0-9]"m${midfix}${extension}${suffix}"); ((${#f[@]}))) &&
+			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 1 1 "${CONFIG_db_utf8mb4[@]}"
 			echo "----------------------------------------------------------------------"
 		  fi
 	  fi
@@ -1950,12 +1999,20 @@ method_backup () {
 		  if [[ "${CONFIG_mysql_dump_use_separate_dirs}" = "yes" ]]; then
 			for db in "${CONFIG_db_names[@]}"; do
 			  echo "Daily Backup of Database ( ${db} )"
-			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 0 "$db"
+			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 0 0 "$db"
+			  echo "----------------------------------------------------------------------"
+			done
+			for db in "${CONFIG_db_utf8mb4[@]}"; do
+			  echo "Daily Backup of Database ( ${db} )"
+			  process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 1 0 "$db"
 			  echo "----------------------------------------------------------------------"
 			done
 		  else
 			echo "Daily backup of databases ( ${CONFIG_db_names[@]} )."
-			process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 1 "${CONFIG_db_names[@]}"
+			process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 0 1 "${CONFIG_db_names[@]}"
+			echo "----------------------------------------------------------------------"
+			echo "Daily backup of databases ( ${CONFIG_db_utf8mb4[@]} )."
+			process_dbs "$subfolder" "$prefix" "$midfix" "$extension" "$rotation" "$rotation_divisor" "$rotation_string" 1 1 "${CONFIG_db_utf8mb4[@]}"
 			echo "----------------------------------------------------------------------"
 		  fi
 	  fi
