@@ -1101,11 +1101,11 @@ parse_databases() {
   done
   # <- remove excluded dbs from list
 
-  # -> remove MySQL 4-byte dbs from list
+  # -> remove MySQL utf8mb4 dbs from list
   for exclude in "${CONFIG_db_utf8mb4[@]}"; do
         for i in "${!alldbnames[@]}"; do if [[ "x${alldbnames[$i]}" = "x${exclude}" ]]; then unset 'alldbnames[i]'; fi; done
   done
-  # <- remove MySQL 4-byte dbs from list
+  # <- remove MySQL utf8mb4 dbs from list
 
   # check for empty array lists and copy all dbs
   ((! ${#CONFIG_db_names[@]}))	&& CONFIG_db_names=( "${alldbnames[@]}" )
@@ -1735,9 +1735,9 @@ method_backup () {
 	echo 
 	echo "Backup of Database Server - ${CONFIG_mysql_dump_host_friendly:-$CONFIG_mysql_dump_host}"
 	( IFS=,; echo "Databases - ${CONFIG_db_names[*]}" )
-	( IFS=,; echo "Databases (4 bytes) - ${CONFIG_db_utf8mb4[*]}" )
+	( IFS=,; echo "Databases (utf8mb4) - ${CONFIG_db_utf8mb4[*]}" )
 	( IFS=,; echo "Databases (monthly) - ${CONFIG_db_month_names[*]}" )
-    ( IFS=,; echo "Databases (4 bytes monthly) - ${CONFIG_db_month_utf8mb4[*]}" )
+    ( IFS=,; echo "Databases (utf8mb4 monthly) - ${CONFIG_db_month_utf8mb4[*]}" )
 	echo "======================================================================"
 
 
