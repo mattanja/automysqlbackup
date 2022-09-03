@@ -84,7 +84,8 @@ load_default_config() {
   CONFIG_mysql_dump_dbstatus='yes'
   CONFIG_mysql_dump_differential='no'
   CONFIG_mysql_dump_login_path='automysqldump'
-  CONFIG_mysql_dump_login_path_file=''
+  CONFIG_mysql_dump_login_path_file='automysqldump'
+  CONFIG_mysql_dump_config_extra_file=''
   CONFIG_mysql_dump_encrypted_login='no'
   CONFIG_backup_local_files=()
   CONFIG_db_names=()
@@ -113,11 +114,17 @@ mysql_commands() {
   VERSION=`mysql -V | grep -oE "[0-9]+\.[0-9]+\.[0-9]+"`
   NODOT_VER=`echo $VERSION | sed $OS_sed_option 's/\.//g'`
   if [ "${CONFIG_mysql_dump_encrypted_login}" = "yes" ]; then
-    export MYSQLDUMP="mysqldump --login-path=$CONFIG_mysql_dump_login_path"
-    export MYSQLSHOW="mysqlshow --login-path=$CONFIG_mysql_dump_login_path"
-    export MYSQL="mysql --login-path=$CONFIG_mysql_dump_login_path"
-    if [ -n "${CONFIG_mysql_dump_login_path_file}" ]; then
-      export MYSQL_TEST_LOGIN_FILE=$CONFIG_mysql_dump_login_path_file
+    if [ "${CONFIG_mysql_dump_config_extra_file}" != "" ]; then
+      export MYSQLDUMP="mysqldump --defaults-extra-file=$CONFIG_mysql_dump_config_extra_file"
+      export MYSQLSHOW="mysqlshow --defaults-extra-file=$CONFIG_mysql_dump_config_extra_file"
+      export MYSQL="mysql --defaults-extra-file=$CONFIG_mysql_dump_config_extra_file"
+    else
+      export MYSQLDUMP="mysqldump --login-path=$CONFIG_mysql_dump_login_path"
+      export MYSQLSHOW="mysqlshow --login-path=$CONFIG_mysql_dump_login_path"
+      export MYSQL="mysql --login-path=$CONFIG_mysql_dump_login_path"
+      if [ -n "${CONFIG_mysql_dump_login_path_file}" ]; then
+        export MYSQL_TEST_LOGIN_FILE=$CONFIG_mysql_dump_login_path_file
+      fi
     fi
   else
     export MYSQLDUMP="mysqldump --user=${CONFIG_mysql_dump_username} --password=${CONFIG_mysql_dump_password} --host=${CONFIG_mysql_dump_host}";
