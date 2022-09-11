@@ -41,6 +41,7 @@ let "E_no_basedir=0x400"
 let "E_config_backupdir_not_writable=0x800"
 let "E_dump_status_failed=0x1000"
 let "E_dump_fullschema_failed=0x2000"
+let "E_dump_users_failed=0x4000"
 
 let "N_config_file_missing=0x01"
 let "N_arg_conffile_parsed=0x02"
@@ -87,6 +88,7 @@ load_default_config() {
   CONFIG_mysql_dump_login_path_file='automysqldump'
   CONFIG_mysql_dump_config_extra_file=''
   CONFIG_mysql_dump_encrypted_login='no'
+  CONFIG_mysql_dump_users='no'
   CONFIG_backup_local_files=()
   CONFIG_db_names=()
   CONFIG_db_month_names=()
@@ -113,23 +115,27 @@ fi
 mysql_commands() {
   VERSION=$(mysql -V | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
   NODOT_VER=$(echo $VERSION | sed $OS_sed_option 's/\.//g')
+  LOGIN_ARGS=""
   if [ "${CONFIG_mysql_dump_encrypted_login}" = "yes" ]; then
     if [ "${CONFIG_mysql_dump_config_extra_file}" != "" ]; then
-      export MYSQLDUMP="mysqldump --defaults-extra-file=$CONFIG_mysql_dump_config_extra_file"
-      export MYSQLSHOW="mysqlshow --defaults-extra-file=$CONFIG_mysql_dump_config_extra_file"
-      export MYSQL="mysql --defaults-extra-file=$CONFIG_mysql_dump_config_extra_file"
+      LOGIN_ARGS="--defaults-extra-file=$CONFIG_mysql_dump_config_extra_file"
     else
-      export MYSQLDUMP="mysqldump --login-path=$CONFIG_mysql_dump_login_path"
-      export MYSQLSHOW="mysqlshow --login-path=$CONFIG_mysql_dump_login_path"
-      export MYSQL="mysql --login-path=$CONFIG_mysql_dump_login_path"
-      if [ -n "${CONFIG_mysql_dump_login_path_file}" ]; then
-        export MYSQL_TEST_LOGIN_FILE=$CONFIG_mysql_dump_login_path_file
-      fi
+      LOGIN_ARGS="--login-path=$CONFIG_mysql_dump_login_path"
     fi
   else
-    export MYSQLDUMP="mysqldump --user=${CONFIG_mysql_dump_username} --password=${CONFIG_mysql_dump_password} --host=${CONFIG_mysql_dump_host}"
-    export MYSQLSHOW="mysqlshow --user=${CONFIG_mysql_dump_username} --password=${CONFIG_mysql_dump_password} --host=${CONFIG_mysql_dump_host}"
-    export MYSQL="mysql --user=${CONFIG_mysql_dump_username} --password=${CONFIG_mysql_dump_password} --host=${CONFIG_mysql_dump_host}"
+    LOGIN_ARGS="--user=${CONFIG_mysql_dump_username} --password=${CONFIG_mysql_dump_password} --host=${CONFIG_mysql_dump_host}"
+  fi
+
+  export MYSQLDUMP="mysqldump $LOGIN_ARGS"
+  export MYSQLSHOW="mysqlshow $LOGIN_ARGS"
+  export MYSQL="mysql $LOGIN_ARGS"
+
+  if [ "${CONFIG_mysql_dump_users}" = "yes" ]; then
+    if command -v mysqlpump &> /dev/null; then
+      export MYSQLUSERS="mysqlpump $LOGIN_ARGS --exclude-databases=% --users"
+    elif command -v mariadb-dump &> /dev/null; then
+      export MYSQLUSERS="mariadb-dump $LOGIN_ARGS --system=users"
+    fi
   fi
 }
 
@@ -660,6 +666,49 @@ fullschema() {
   fi
 }
 
+# @info:	Backup of the database users.
+# @args:	filename to save data to
+# @return:	true in case of dry-run, otherwise the return value of mysqlpump
+# @deps:	load_default_config, parse_configuration
+users() {
+  if (($CONFIG_dryrun)); then
+    case "${CONFIG_mysql_dump_compression}" in
+    'gzip')
+      echo "dry-running: $MYSQLUSERS | gzip_compression > ${1}${suffix}"
+      ;;
+    'bzip2')
+      echo "dry-running: $MYSQLUSERS | bzip2_compression > ${1}${suffix}"
+      ;;
+    *)
+      echo "dry-running: $MYSQLUSERS > ${1}${suffix}"
+      ;;
+    esac
+    return 0
+  else
+    log_usersfile="/tmp/${CONFIG_mysql_dump_host}-$(date +%N)-users.log"
+    case "${CONFIG_mysql_dump_compression}" in
+    'gzip')
+      $MYSQLUSERS 2>"$log_usersfile" | gzip_compression >"${1}${suffix}"
+      ;;
+    'bzip2')
+      $MYSQLUSERS 2>"$log_usersfile" | bzip2_compression >"${1}${suffix}"
+      ;;
+    *)
+      $MYSQLUSERS 2>"$log_usersfile" >"${1}${suffix}"
+      ;;
+    esac
+
+    firstline=$(head -n 1 "$log_usersfile")
+    if ! [[ $firstline =~ ^"Dump completed"* ]]; then
+      cat "$log_usersfile" >> "$log_errfile"
+    fi
+
+    rm -f "$log_usersfile"
+
+    return $?
+  fi
+}
+
 # @info:	Process a single db.
 # @args:	subfolder, prefix, midfix, extension, rotation, rotation_divisor, rotation_string, 0/1 (db/dbs), db[, db ...]
 process_dbs() {
@@ -911,6 +960,7 @@ directory_checks_enable_logging() {
   checkdirs=("${CONFIG_backup_dir}"/{daily,weekly,monthly,latest,tmp})
   [[ "${CONFIG_backup_local_files[@]}" ]] && { checkdirs=("${checkdirs[@]}" "${CONFIG_backup_dir}/backup_local_files"); }
   [[ "${CONFIG_mysql_dump_full_schema}" = 'yes' ]] && { checkdirs=("${checkdirs[@]}" "${CONFIG_backup_dir}/fullschema"); }
+  [[ "${CONFIG_mysql_dump_users}" = 'yes' ]] && { checkdirs=("${checkdirs[@]}" "${CONFIG_backup_dir}/users"); }
   [[ "${CONFIG_mysql_dump_dbstatus}" = 'yes' ]] && { checkdirs=("${checkdirs[@]}" "${CONFIG_backup_dir}/status"); }
 
   tmp_permcheck=0
@@ -1906,6 +1956,76 @@ method_backup() {
 
   fi
   # <- dump full schema
+
+  # -> dump users
+  if [[ "${CONFIG_mysql_dump_users}" = 'yes' ]]; then
+    echo "======================================================================"
+    echo "Dump users."
+    echo
+
+    # monthly
+    if (( ${CONFIG_do_monthly} != 0 && (${date_day_of_month} == ${CONFIG_do_monthly} || $date_day_of_month == $date_lastday_of_this_month && $date_lastday_of_this_month < ${CONFIG_do_monthly}) )) && (shopt -s nullglob dotglob; f=("${CONFIG_backup_dir}/users/users_monthly_${date_stamp}_"[0-9][0-9]"h"[0-9][0-9]"m_${date_month}.sql${suffix}"); ((! ${#f[@]}))); then
+      users "${CONFIG_backup_dir}/users/users_monthly_${datetimestamp}_${date_month}.sql"
+      if (($? == 0)); then
+        echo "Rotating $((${CONFIG_rotation_monthly} / 31)) month backups for ${mdb}"
+        if (($CONFIG_dryrun)); then
+          find "${CONFIG_backup_dir}/users" -mtime +"${CONFIG_rotation_monthly}" -type f -name 'users_monthly*' -exec echo "dry-running: rm" {} \;
+        else
+          find "${CONFIG_backup_dir}/users" -mtime +"${CONFIG_rotation_monthly}" -type f -name 'users_monthly*' -exec rm {} \;
+        fi
+        files_postprocessing "${CONFIG_backup_dir}/users/users_monthly_${datetimestamp}_${date_month}.sql${suffix}"
+        tmp_flags=$?
+        var=
+        (($tmp_flags & $flags_files_postprocessing_success_encrypt)) && var=.enc
+        backupfiles=("${backupfiles[@]}" "${CONFIG_backup_dir}/users/users_monthly_${datetimestamp}_${date_month}.sql${suffix}${var}")
+      else
+        let "E |= $E_dump_users_failed"
+      fi
+    fi
+
+    # weekly
+    if [[ ${CONFIG_do_weekly} != 0 && ${date_dayno_of_week} = ${CONFIG_do_weekly} ]] && (shopt -s nullglob dotglob; f=("${CONFIG_backup_dir}/users/users_weekly_${date_stamp}_"[0-9][0-9]"h"[0-9][0-9]"m_${date_weekno}.sql${suffix}"); ((! ${#f[@]}))); then
+      users "${CONFIG_backup_dir}/users/users_weekly_${datetimestamp}_${date_weekno}.sql"
+      if (($? == 0)); then
+        echo "Rotating $((${CONFIG_rotation_monthly} / 31)) month backups for ${mdb}"
+        if (($CONFIG_dryrun)); then
+          find "${CONFIG_backup_dir}/users" -mtime +"${CONFIG_rotation_weekly}" -type f -name 'users_weekly*' -exec echo "dry-running: rm" {} \;
+        else
+          find "${CONFIG_backup_dir}/users" -mtime +"${CONFIG_rotation_weekly}" -type f -name 'users_weekly*' -exec rm {} \;
+        fi
+        files_postprocessing "${CONFIG_backup_dir}/users/users_weekly_${datetimestamp}_${date_weekno}.sql${suffix}"
+        tmp_flags=$?
+        var=
+        (($tmp_flags & $flags_files_postprocessing_success_encrypt)) && var=.enc
+        backupfiles=("${backupfiles[@]}" "${CONFIG_backup_dir}/users/users_weekly_${datetimestamp}_${date_weekno}.sql${suffix}${var}")
+      else
+        let "E |= $E_dump_users_failed"
+      fi
+    fi
+
+    # daily
+    users "${CONFIG_backup_dir}/users/users_daily_${datetimestamp}_${date_day_of_week}.sql"
+    if (($? == 0)); then
+      echo "Rotating $((${CONFIG_rotation_monthly} / 31)) month backups for ${mdb}"
+      if (($CONFIG_dryrun)); then
+        find "${CONFIG_backup_dir}/users" -mtime +"${CONFIG_rotation_daily}" -type f -name 'users_daily*' -exec echo "dry-running: rm" {} \;
+      else
+        find "${CONFIG_backup_dir}/users" -mtime +"${CONFIG_rotation_daily}" -type f -name 'users_daily*' -exec rm {} \;
+      fi
+      files_postprocessing "${CONFIG_backup_dir}/users/users_daily_${datetimestamp}_${date_day_of_week}.sql${suffix}"
+      tmp_flags=$?
+      var=
+      (($tmp_flags & $flags_files_postprocessing_success_encrypt)) && var=.enc
+      backupfiles=("${backupfiles[@]}" "${CONFIG_backup_dir}/users/users_daily_${datetimestamp}_${date_day_of_week}.sql${suffix}${var}")
+    else
+      let "E |= $E_dump_users_failed"
+    fi
+    echo
+    echo "======================================================================"
+    echo
+
+  fi
+  # <- dump users
 
   # -> dump status
   if [[ "${CONFIG_mysql_dump_dbstatus}" = 'yes' ]]; then
