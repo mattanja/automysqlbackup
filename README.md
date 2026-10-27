@@ -1,6 +1,13 @@
 # AutomysqlBackup
 
+## Retired
+
+I have stopped using AutomysqlBackup, and this repository is archived as of October 2026. The script and its history stay available if you already rely on them. There will be no further fixes, releases, or pull requests.
+
+If you still use it, keep your own copy. A backup that lives only on the database server will not help if that disk fails. See the disclaimer below.
+
 - [AutomysqlBackup](#automysqlbackup)
+  - [Retired](#retired)
   - [About](#about)
   - [Disclaimer](#disclaimer)
   - [Install](#install)
@@ -16,10 +23,9 @@
 This script was originally developed by a team over at SourceForge:
 https://sourceforge.net/projects/automysqlbackup/
 
-Since the project there seems not to be maintained anymore, I have set up a clone here for
-further maintenance and to simplify installation with a git repo.
-
-Pull-Requests are welcome!
+Since the project there seemed not to be maintained anymore, I set up a clone here for
+further maintenance and to simplify installation with a git repo. I no longer use this
+tool. This repository is archived and will not take further changes.
 
 ## Disclaimer
 
